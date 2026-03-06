@@ -1,70 +1,29 @@
 <html>
 <head>
-
 <script src="https://unpkg.com/wavesurfer.js"></script>
-
 <style>
-
-body{
-font-family:"DotGothic16",sans-serif;
-margin:40px;
-max-width:900px;
-}
-
-#waveform{
-margin-bottom:10px;
-}
-
-#controls{
-margin-bottom:20px;
-}
-
-button{
-margin-right:10px;
-font-family:inherit;
-}
-
-#time{
-font-size:12px;
-margin-top:6px;
-}
-
-#playlist{
-max-height:300px;
-overflow-y:auto;
-border-top:1px solid #eee;
-}
-
-#playlist div{
-cursor:pointer;
-padding:8px;
-border-bottom:1px solid #eee;
-}
-
-#playlist div:hover{
-background:#f3f3f3;
-}
-
-#playlist .active{
-background:#ddd;
-}
-
+body{font-family:"DotGothic16",sans-serif;margin:40px;max-width:900px;}
+#waveform{margin-bottom:10px;}
+#controls{margin-bottom:20px;}
+button{margin-right:10px;font-family:inherit;}
+#time{font-size:12px;margin-top:6px;}
+#playlist{max-height:300px;overflow-y:auto;border-top:1px solid #eee;}
+#playlist div{cursor:pointer;padding:8px;border-bottom:1px solid #eee;}
+#playlist div:hover{background:#f3f3f3;}
+#playlist .active{background:#ddd;}
 </style>
-
 </head>
 
 <body>
-
 <h2>Audio Dump</h2>
-
 <div id="waveform"></div>
 
 <div id="controls">
-<button id="prev">prev</button>
-<button id="play">play / pause</button>
-<button id="next">next</button>
-
-<div id="time">0:00 / 0:00</div>
+  <button id="prev">prev</button>
+  <button id="play">play / pause</button>
+  <button id="next">next</button>
+  <button id="autoplay-toggle">Autoplay: ON</button>
+  <div id="time">0:00 / 0:00</div>
 </div>
 
 <h3>Tracks</h3>
@@ -76,130 +35,108 @@ const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
 
 let tracks=[];
 let current=0;
-let autoplay=false;
+let nextTrackIndex = null;  // traccia da riprodurre al ready
+let autoplay=true;           // toggle globale autoplay
 
 const wavesurfer=WaveSurfer.create({
-container:"#waveform",
-waveColor:"#FF0000",
-progressColor:"#FFFFFF",
-height:120
+  container:"#waveform",
+  waveColor:"#FF0000",
+  progressColor:"#FFFFFF",
+  height:120
 });
 
 const playlist=document.getElementById("playlist");
 
+// Carica lista tracce da GitHub
 fetch(api)
 .then(r=>r.json())
 .then(files=>{
+  tracks = files.filter(f=>f.name.endsWith(".mp3"));
 
-tracks=files.filter(f=>f.name.endsWith(".mp3"));
+  tracks.forEach((track,i)=>{
+    const item=document.createElement("div");
+    item.innerText=track.name;
 
-tracks.forEach((track,i)=>{
+    item.onclick=()=>{
+      nextTrackIndex = i;
+      loadTrack(i);
+    };
 
-const item=document.createElement("div");
-item.innerText=track.name;
+    playlist.appendChild(item);
+  });
 
-item.onclick=()=>{
-autoplay=true;
-loadTrack(i);
-};
-
-playlist.appendChild(item);
-
-});
-
-loadTrack(0);
-
+  loadTrack(0);
 });
 
 function loadTrack(i){
-
-current=i;
-
-document.querySelectorAll("#playlist div")
-.forEach(el=>el.classList.remove("active"));
-
-const active=document.querySelectorAll("#playlist div")[i];
-
-active.classList.add("active");
-
-active.scrollIntoView({
-behavior:"smooth",
-block:"nearest"
-});
-
-wavesurfer.load(tracks[i].download_url);
-
+  highlightTrack(i);
+  wavesurfer.load(tracks[i].download_url);
 }
 
-wavesurfer.on("ready",()=>{
-
-updateTime();
-
-if(autoplay){
-wavesurfer.play();
+function highlightTrack(i){
+  current = i; // aggiornamento variabile “current”
+  document.querySelectorAll("#playlist div").forEach(el=>el.classList.remove("active"));
+  const active=document.querySelectorAll("#playlist div")[i];
+  active.classList.add("active");
+  active.scrollIntoView({behavior:"smooth", block:"nearest"});
 }
 
+// Play automatico al ready
+wavesurfer.on("ready", ()=>{
+  updateTime();
+  if(nextTrackIndex !== null){
+    wavesurfer.play();
+    nextTrackIndex = null; // reset
+  }
 });
 
-wavesurfer.on("audioprocess",updateTime);
-wavesurfer.on("seek",updateTime);
+wavesurfer.on("audioprocess", updateTime);
+wavesurfer.on("seek", updateTime);
 
 function updateTime(){
-
-const currentTime=wavesurfer.getCurrentTime();
-const duration=wavesurfer.getDuration();
-
-document.getElementById("time").innerText=
-format(currentTime)+" / "+format(duration);
-
+  const t = wavesurfer.getCurrentTime();
+  const d = wavesurfer.getDuration();
+  document.getElementById("time").innerText = format(t)+" / "+format(d);
 }
 
 function format(sec){
-
-sec=Math.floor(sec);
-const m=Math.floor(sec/60);
-const s=sec%60;
-
-return m+":"+(s<10?"0"+s:s);
-
+  sec = Math.floor(sec);
+  const m = Math.floor(sec/60);
+  const s = sec%60;
+  return m+":"+(s<10?"0"+s:s);
 }
 
-wavesurfer.on("finish",()=>{
-
-current++;
-
-if(current<tracks.length){
-
-autoplay=true;
-loadTrack(current);
-
-}
-
+// Fine traccia → autoplay next
+wavesurfer.on("finish", ()=>{
+  if(autoplay && current < tracks.length-1){
+    nextTrackIndex = current+1;
+    loadTrack(current+1);
+  }
 });
 
-document.getElementById("play").onclick=()=>{
-wavesurfer.playPause();
+// Controlli
+document.getElementById("play").onclick = ()=>{wavesurfer.playPause();};
+document.getElementById("next").onclick = ()=>{
+  if(current<tracks.length-1){
+    nextTrackIndex = current+1;
+    loadTrack(current+1);
+  }
+};
+document.getElementById("prev").onclick = ()=>{
+  if(current>0){
+    nextTrackIndex = current-1;
+    loadTrack(current-1);
+  }
 };
 
-document.getElementById("next").onclick=()=>{
-
-if(current<tracks.length-1){
-autoplay=true;
-loadTrack(current+1);
-}
-
-};
-
-document.getElementById("prev").onclick=()=>{
-
-if(current>0){
-autoplay=true;
-loadTrack(current-1);
-}
-
+// Toggle Autoplay
+const autoplayBtn = document.getElementById("autoplay-toggle");
+autoplayBtn.onclick = () => {
+  autoplay = !autoplay;
+  autoplayBtn.innerText = "Autoplay: " + (autoplay ? "ON" : "OFF");
+  autoplayBtn.style.backgroundColor = autoplay ? "#8f8" : "#f88";
 };
 
 </script>
-
 </body>
 </html>

@@ -1,57 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head>
-
-<script src="https://unpkg.com/wavesurfer.js"></script>
-
-<style>
-
-body{
-font-family:"Pixelify Sans", sans-serif;
-margin:40px;
-max-width:900px;
-}
-
-#waveform{
-margin-bottom:20px;
-}
-
-#playlist div{
-cursor:pointer;
-padding:6px;
-border-bottom:1px solid #eee;
-}
-
-#playlist div:hover{
-background:#f3f3f3;
-}
-
-#playlist .active{
-background:#ddd;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<h2>Audio Dump</h2>
-
-<div id="waveform"></div>
-
-<button id="play">play / pause</button>
-
-<h3>Tracks</h3>
-
-<div id="playlist"></div>
-
 <script>
 
 const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
 
 let tracks=[];
 let current=0;
+let autoplay=false;
 
 const wavesurfer=WaveSurfer.create({
 container:"#waveform",
@@ -74,8 +27,8 @@ const item=document.createElement("div");
 item.innerText=track.name;
 
 item.onclick=()=>{
+autoplay=true;
 loadTrack(i);
-wavesurfer.play();
 };
 
 playlist.appendChild(item);
@@ -100,14 +53,22 @@ wavesurfer.load(tracks[i].download_url);
 
 }
 
+wavesurfer.on("ready",()=>{
+
+if(autoplay){
+wavesurfer.play();
+}
+
+});
+
 wavesurfer.on("finish",()=>{
 
 current++;
 
 if(current<tracks.length){
 
+autoplay=true;
 loadTrack(current);
-wavesurfer.play();
 
 }
 
@@ -118,6 +79,3 @@ wavesurfer.playPause();
 };
 
 </script>
-
-</body>
-</html>

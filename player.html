@@ -5,73 +5,117 @@
 <script src="https://unpkg.com/wavesurfer.js"></script>
 
 <style>
+
 body{
-font-family: sans-serif;
-max-width:700px;
-margin:auto;
+font-family:"Pixelify Sans", sans-serif;
+margin:40px;
+max-width:900px;
 }
 
-.track{
-margin-bottom:30px;
+#waveform{
+margin-bottom:20px;
 }
 
-button{
-margin-top:10px;
+#playlist div{
+cursor:pointer;
+padding:6px;
+border-bottom:1px solid #eee;
 }
+
+#playlist div:hover{
+background:#f3f3f3;
+}
+
+#playlist .active{
+background:#ddd;
+}
+
 </style>
 
 </head>
 
 <body>
 
-<h2>Audio dump</h2>
+<h2>Audio Dump</h2>
+
+<div id="waveform"></div>
+
+<button id="play">play / pause</button>
+
+<h3>Tracks</h3>
 
 <div id="playlist"></div>
 
 <script>
 
-const repoAPI = "https://api.github.com/repos/overcesium/dump/contents/mp3";
+const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
 
-fetch(repoAPI)
-.then(r => r.json())
-.then(files => {
+let tracks=[];
+let current=0;
 
-files
-.filter(f => f.name.endsWith(".mp3"))
-.forEach((file,i)=>{
-
-const container = document.createElement("div");
-container.className = "track";
-
-const title = document.createElement("div");
-title.innerText = file.name;
-
-const waveDiv = document.createElement("div");
-waveDiv.id = "wave"+i;
-
-const button = document.createElement("button");
-button.innerText = "play / pause";
-
-container.appendChild(title);
-container.appendChild(waveDiv);
-container.appendChild(button);
-
-document.getElementById("playlist").appendChild(container);
-
-const wave = WaveSurfer.create({
-container:"#wave"+i,
+const wavesurfer=WaveSurfer.create({
+container:"#waveform",
 waveColor:"#FF0000",
-progressColor:"#000",
-height:80
+progressColor:"#FFFFFF",
+height:120
 });
 
-wave.load(file.download_url);
+fetch(api)
+.then(r=>r.json())
+.then(files=>{
 
-button.onclick = ()=>wave.playPause();
+tracks=files.filter(f=>f.name.endsWith(".mp3"));
+
+const playlist=document.getElementById("playlist");
+
+tracks.forEach((track,i)=>{
+
+const item=document.createElement("div");
+item.innerText=track.name;
+
+item.onclick=()=>{
+loadTrack(i);
+wavesurfer.play();
+};
+
+playlist.appendChild(item);
 
 });
 
+loadTrack(0);
+
 });
+
+function loadTrack(i){
+
+current=i;
+
+document.querySelectorAll("#playlist div")
+.forEach(el=>el.classList.remove("active"));
+
+document.querySelectorAll("#playlist div")[i]
+.classList.add("active");
+
+wavesurfer.load(tracks[i].download_url);
+
+}
+
+wavesurfer.on("finish",()=>{
+
+current++;
+
+if(current<tracks.length){
+
+loadTrack(current);
+wavesurfer.play();
+
+}
+
+});
+
+document.getElementById("play").onclick=()=>{
+wavesurfer.playPause();
+};
 
 </script>
 

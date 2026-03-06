@@ -1,3 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script src="https://unpkg.com/wavesurfer.js"></script>
+
+<style>
+
+body{
+font-family:"DotGothic16", sans-serif;
+margin:40px;
+max-width:900px;
+}
+
+#waveform{
+margin-bottom:20px;
+}
+
+#playlist div{
+cursor:pointer;
+padding:6px;
+border-bottom:1px solid #eee;
+}
+
+#playlist div:hover{
+background:#FF0000;
+}
+
+#playlist .active{
+background:#FFFFFF;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Audio Dump</h2>
+
+<div id="waveform"></div>
+
+<button id="play">play / pause</button>
+
+<h3>Tracks</h3>
+
+<div id="playlist"></div>
+
 <script>
 
 const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
@@ -79,3 +127,6 @@ wavesurfer.playPause();
 };
 
 </script>
+
+</body>
+</html>

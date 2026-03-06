@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script src="https://unpkg.com/wavesurfer.js"></script>
+
+<style>
+body{
+font-family: sans-serif;
+max-width:700px;
+margin:auto;
+}
+
+.track{
+margin-bottom:30px;
+}
+
+button{
+margin-top:10px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h2>Audio dump</h2>
+
+<div id="playlist"></div>
+
+<script>
+
+const repoAPI = "https://api.github.com/repos/overcesium/dump/contents/mp3";
+
+fetch(repoAPI)
+.then(r => r.json())
+.then(files => {
+
+files
+.filter(f => f.name.endsWith(".mp3"))
+.forEach((file,i)=>{
+
+const container = document.createElement("div");
+container.className = "track";
+
+const title = document.createElement("div");
+title.innerText = file.name;
+
+const waveDiv = document.createElement("div");
+waveDiv.id = "wave"+i;
+
+const button = document.createElement("button");
+button.innerText = "play / pause";
+
+container.appendChild(title);
+container.appendChild(waveDiv);
+container.appendChild(button);
+
+document.getElementById("playlist").appendChild(container);
+
+const wave = WaveSurfer.create({
+container:"#wave"+i,
+waveColor:"#999",
+progressColor:"#000",
+height:80
+});
+
+wave.load(file.download_url);
+
+button.onclick = ()=>wave.playPause();
+
+});
+
+});
+
+</script>
+
+</body>
+</html>

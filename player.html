@@ -2,26 +2,95 @@
 <head>
 <script src="https://unpkg.com/wavesurfer.js"></script>
 <style>
-body{font-family:"DotGothic16",sans-serif;margin:40px;max-width:900px;}
-#waveform{margin-bottom:10px;}
-#controls{margin-bottom:20px;}
-button{margin-right:10px;font-family:inherit;}
-#time{font-size:12px;margin-top:6px;}
-#playlist{max-height:300px;overflow-y:auto;border-top:1px solid #eee;}
-#playlist div{cursor:pointer;padding:8px;border-bottom:1px solid #eee;}
-#playlist div:hover{background:#f3f3f3;}
-#playlist .active{background:#ddd;}
+/* ============================= */
+/* Configurazione colori e font */
+/* ============================= */
+:root {
+  --font-player: "DotGothic16", sans-serif;
+  --color-bg: #121212;
+  --color-text: #FFFFFF;
+  --color-wave: #FF0000;
+  --color-wave-progress: #FFFFFF;
+  --color-button-bg: #333333;
+  --color-button-text: #FFFFFF;
+  --color-button-hover: #555555;
+  --color-autoplay-on: #8f8;
+  --color-autoplay-off: #f88;
+  --color-playlist-bg: #1e1e1e;
+  --color-playlist-text: #FFFFFF;
+  --color-playlist-hover: #333333;
+  --color-playlist-active: #555555;
+  --color-time-text: #CCCCCC;
+}
+
+body {
+  font-family: var(--font-player);
+  margin: 40px;
+  max-width: 900px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+#waveform {
+  margin-bottom: 10px;
+}
+
+#controls {
+  margin-bottom: 20px;
+}
+
+button {
+  font-family: var(--font-player);
+  background-color: var(--color-button-bg);
+  color: var(--color-button-text);
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  background-color: var(--color-button-hover);
+}
+
+#time {
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--color-time-text);
+}
+
+#playlist {
+  max-height: 300px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-playlist-hover);
+  background-color: var(--color-playlist-bg);
+}
+
+#playlist div {
+  cursor: pointer;
+  padding: 8px;
+  border-bottom: 1px solid var(--color-playlist-hover);
+  color: var(--color-playlist-text);
+}
+
+#playlist div:hover {
+  background-color: var(--color-playlist-hover);
+}
+
+#playlist .active {
+  background-color: var(--color-playlist-active);
+}
 </style>
 </head>
 
 <body>
-<h2>Audio Dump</h2>
+<h2>Trashy music player!</h2>
 <div id="waveform"></div>
 
 <div id="controls">
-  <button id="prev">prev</button>
+  <button id="prev">previous track</button>
   <button id="play">play / pause</button>
-  <button id="next">next</button>
+  <button id="next">next track</button>
   <button id="autoplay-toggle">Autoplay: ON</button>
   <div id="time">0:00 / 0:00</div>
 </div>
@@ -30,7 +99,6 @@ button{margin-right:10px;font-family:inherit;}
 <div id="playlist"></div>
 
 <script>
-
 const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
 
 let tracks=[];
@@ -40,8 +108,8 @@ let autoplay=true;           // toggle globale autoplay
 
 const wavesurfer=WaveSurfer.create({
   container:"#waveform",
-  waveColor:"#FF0000",
-  progressColor:"#FFFFFF",
+  waveColor: getComputedStyle(document.documentElement).getPropertyValue('--color-wave').trim(),
+  progressColor: getComputedStyle(document.documentElement).getPropertyValue('--color-wave-progress').trim(),
   height:120
 });
 
@@ -74,7 +142,7 @@ function loadTrack(i){
 }
 
 function highlightTrack(i){
-  current = i; // aggiornamento variabile “current”
+  current = i;
   document.querySelectorAll("#playlist div").forEach(el=>el.classList.remove("active"));
   const active=document.querySelectorAll("#playlist div")[i];
   active.classList.add("active");
@@ -86,7 +154,7 @@ wavesurfer.on("ready", ()=>{
   updateTime();
   if(nextTrackIndex !== null){
     wavesurfer.play();
-    nextTrackIndex = null; // reset
+    nextTrackIndex = null; 
   }
 });
 
@@ -110,7 +178,9 @@ function format(sec){
 wavesurfer.on("finish", ()=>{
   if(autoplay && current < tracks.length-1){
     nextTrackIndex = current+1;
-    loadTrack(current+1);
+    setTimeout(()=>{
+      loadTrack(nextTrackIndex);
+    }, 50);
   }
 });
 
@@ -134,9 +204,9 @@ const autoplayBtn = document.getElementById("autoplay-toggle");
 autoplayBtn.onclick = () => {
   autoplay = !autoplay;
   autoplayBtn.innerText = "Autoplay: " + (autoplay ? "ON" : "OFF");
-  autoplayBtn.style.backgroundColor = autoplay ? "#8f8" : "#f88";
+  autoplayBtn.style.backgroundColor = autoplay ? getComputedStyle(document.documentElement).getPropertyValue('--color-autoplay-on').trim()
+                                                : getComputedStyle(document.documentElement).getPropertyValue('--color-autoplay-off').trim();
 };
-
 </script>
 </body>
 </html>

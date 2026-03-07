@@ -1,211 +1,283 @@
 <html>
 <head>
+<meta charset="UTF-8">
+
+<!-- Font DotGothic16 -->
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+
 <script src="https://unpkg.com/wavesurfer.js"></script>
+
 <style>
-/* ============================= */
-/* Configurazione colori e font */
-/* ============================= */
-:root {
-  --font-player: "DotGothic16", sans-serif;
-  --color-bg: #000000;
-  --color-text: #FFFFFF;
-  --color-wave: #FF0000;
-  --color-wave-progress: #FFFFFF;
-  --color-button-bg: #000000;
-  --color-button-text: #FFFFFF;
-  --color-button-hover: #FF0000;
-  --color-autoplay-on: #8f8;
-  --color-autoplay-off: #f88;
-  --color-playlist-bg: #1e1e1e;
-  --color-playlist-text: #FFFFFF;
-  --color-playlist-hover: #333333;
-  --color-playlist-active: #FF0000;
-  --color-time-text: #FF0000;
+/* =========================
+VARIABILI COLORI E FONT
+========================= */
+:root{
+--bg:#111;
+--text:#fff;
+--accent:#ff0055;
+--box:#1c1c1c;
+--hover:#333;
+--wave:#ff0055;
+--progress:#fff;
+--font:"DotGothic16", monospace;
 }
 
-body {
-  font-family: var(--font-player);
-  margin: 40px;
-  max-width: 900px;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+/* =========================
+BASE
+========================= */
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  margin:40px;
+  max-width:900px;
 }
+h2{margin-bottom:20px;}
 
-#waveform {
-  margin-bottom: 10px;
+/* =========================
+WAVEFORM
+========================= */
+#waveform{margin-bottom:15px;}
+
+/* =========================
+CONTROLLI
+========================= */
+#controls{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:20px;
 }
-
-#controls {
-  margin-bottom: 20px;
+button{
+  background:none;
+  border:none;
+  cursor:pointer;
 }
-
-button {
-  font-family: var(--font-player);
-  background-color: var(--color-button-bg);
-  color: var(--color-button-text);
-  border: none;
-  padding: 8px 12px;
-  cursor: pointer;
-  border-radius: 4px;
+button img{
+  width:36px;
+  height:36px;
 }
+#time{font-size:12px;}
 
-button:hover {
-  background-color: var(--color-button-hover);
+/* =========================
+PLAYLIST
+========================= */
+#playlist{
+  background:var(--box);
+  border:1px solid var(--hover);
+  max-height:350px;
+  overflow-y:auto;
+  padding:4px 0;
 }
-
-#time {
-  font-size: 12px;
-  margin-top: 6px;
-  color: var(--color-time-text);
+.item{
+  padding:8px;
+  cursor:pointer;
+  border-bottom:1px solid var(--hover);
 }
-
-#playlist {
-  max-height: 300px;
-  overflow-y: auto;
-  border-top: 1px solid var(--color-playlist-hover);
-  background-color: var(--color-playlist-bg);
+.item:hover{
+  background:var(--hover);
 }
-
-#playlist div {
-  cursor: pointer;
-  padding: 8px;
-  border-bottom: 1px solid var(--color-playlist-hover);
-  color: var(--color-playlist-text);
+.active{
+  background:var(--accent);
 }
-
-#playlist div:hover {
-  background-color: var(--color-playlist-hover);
+.folder{
+  color:var(--accent);
+  font-weight:bold;
 }
-
-#playlist .active {
-  background-color: var(--color-playlist-active);
+#breadcrumb{
+  margin-bottom:8px;
+  font-size:13px;
+  color:var(--accent);
 }
 </style>
 </head>
 
 <body>
+
+<h2>Trashy Music Player</h2>
+
 <div id="waveform"></div>
 
 <div id="controls">
-  <button id="prev">previous track</button>
-  <button id="play">play / pause</button>
-  <button id="next">next track</button>
-  <button id="autoplay-toggle">Autoplay: ON</button>
+  <button id="prev"><img src="icons/prev.png"></button>
+  <button id="play"><img src="icons/play.png"></button>
+  <button id="next"><img src="icons/next.png"></button>
+  <button id="autoplay"><img src="icons/autoplay.png"></button>
+  <button id="back" style="display:none;"><img src="icons/folder.png"> Back</button>
   <div id="time">0:00 / 0:00</div>
 </div>
 
-<h3>Tracks</h3>
+<div id="breadcrumb"></div>
+
+<h3>Library</h3>
 <div id="playlist"></div>
 
 <script>
-const api="https://api.github.com/repos/overcesium/dump/contents/mp3";
+/* =========================
+CONFIG
+========================= */
+const repo = "overcesium/dump";
+const base = "https://api.github.com/repos/"+repo+"/contents/mp3";
 
 let tracks=[];
 let current=0;
-let nextTrackIndex = null;  // traccia da riprodurre al ready
-let autoplay=true;           // toggle globale autoplay
+let autoplay=true;
+let folderStack=[]; // per breadcrumb
 
-const wavesurfer=WaveSurfer.create({
+/* =========================
+WAVESURFER
+========================= */
+const wavesurfer = WaveSurfer.create({
   container:"#waveform",
-  waveColor: getComputedStyle(document.documentElement).getPropertyValue('--color-wave').trim(),
-  progressColor: getComputedStyle(document.documentElement).getPropertyValue('--color-wave-progress').trim(),
+  waveColor:getComputedStyle(document.documentElement).getPropertyValue('--wave'),
+  progressColor:getComputedStyle(document.documentElement).getPropertyValue('--progress'),
   height:120
 });
 
+/* =========================
+ELEMENTI
+========================= */
 const playlist=document.getElementById("playlist");
+const backBtn=document.getElementById("back");
+const breadcrumb=document.getElementById("breadcrumb");
 
-// Carica lista tracce da GitHub
-fetch(api)
-.then(r=>r.json())
-.then(files=>{
-  tracks = files.filter(f=>f.name.endsWith(".mp3"));
-
-  tracks.forEach((track,i)=>{
-    const item=document.createElement("div");
-    item.innerText=track.name;
-
-    item.onclick=()=>{
-      nextTrackIndex = i;
-      loadTrack(i);
-    };
-
-    playlist.appendChild(item);
+/* =========================
+FUNZIONI PER CARTE
+========================= */
+function loadFolders(){
+  playlist.innerHTML="";
+  backBtn.style.display="none";
+  breadcrumb.innerText="Home";
+  folderStack=[];
+  
+  fetch(base)
+  .then(r=>r.json())
+  .then(items=>{
+    items.forEach(item=>{
+      if(item.type==="dir"){
+        const div=document.createElement("div");
+        div.className="item folder";
+        div.innerText="📁 "+item.name;
+        div.onclick=()=>{
+          folderStack.push(item.name);
+          loadFolder(item.path);
+        };
+        playlist.appendChild(div);
+      }
+    });
   });
+}
 
-  loadTrack(0);
-});
+function loadFolder(path){
+  playlist.innerHTML="";
+  backBtn.style.display="inline-block";
+  updateBreadcrumb();
+  
+  fetch("https://api.github.com/repos/"+repo+"/contents/"+path)
+  .then(r=>r.json())
+  .then(files=>{
+    tracks = files.filter(f=>f.name.endsWith(".mp3"));
+    files.forEach((file,i)=>{
+      if(file.type==="file" && file.name.endsWith(".mp3")){
+        const div=document.createElement("div");
+        div.className="item";
+        div.innerText=file.name;
+        div.onclick=()=>{
+          current=i;
+          loadTrack(i);
+        };
+        playlist.appendChild(div);
+      }
+    });
+  });
+}
 
+function updateBreadcrumb(){
+  breadcrumb.innerText = "Home / " + folderStack.join(" / ");
+}
+
+/* =========================
+BACK BUTTON
+========================= */
+backBtn.onclick = ()=>{
+  folderStack.pop();
+  if(folderStack.length===0){
+    loadFolders();
+  } else {
+    // ricostruire path
+    const path = "mp3/" + folderStack.join("/");
+    loadFolder(path);
+  }
+};
+
+/* =========================
+LOAD TRACK
+========================= */
 function loadTrack(i){
-  highlightTrack(i);
+  highlight(i);
   wavesurfer.load(tracks[i].download_url);
 }
 
-function highlightTrack(i){
-  current = i;
-  document.querySelectorAll("#playlist div").forEach(el=>el.classList.remove("active"));
-  const active=document.querySelectorAll("#playlist div")[i];
-  active.classList.add("active");
-  active.scrollIntoView({behavior:"smooth", block:"nearest"});
+function highlight(i){
+  document.querySelectorAll(".item").forEach(el=>el.classList.remove("active"));
+  const active=document.querySelectorAll(".item")[i];
+  if(active) active.classList.add("active");
 }
 
-// Play automatico al ready
-wavesurfer.on("ready", ()=>{
+/* =========================
+READY
+========================= */
+wavesurfer.on("ready",()=>{
   updateTime();
-  if(nextTrackIndex !== null){
-    wavesurfer.play();
-    nextTrackIndex = null; 
-  }
+  wavesurfer.play();
 });
 
-wavesurfer.on("audioprocess", updateTime);
-wavesurfer.on("seek", updateTime);
+/* =========================
+TIME
+========================= */
+wavesurfer.on("audioprocess",updateTime);
+wavesurfer.on("seek",updateTime);
 
 function updateTime(){
-  const t = wavesurfer.getCurrentTime();
-  const d = wavesurfer.getDuration();
-  document.getElementById("time").innerText = format(t)+" / "+format(d);
+  const t=wavesurfer.getCurrentTime();
+  const d=wavesurfer.getDuration();
+  document.getElementById("time").innerText=format(t)+" / "+format(d);
 }
 
 function format(sec){
-  sec = Math.floor(sec);
-  const m = Math.floor(sec/60);
-  const s = sec%60;
+  sec=Math.floor(sec);
+  const m=Math.floor(sec/60);
+  const s=sec%60;
   return m+":"+(s<10?"0"+s:s);
 }
 
-// Fine traccia → autoplay next
-wavesurfer.on("finish", ()=>{
-  if(autoplay && current < tracks.length-1){
-    nextTrackIndex = current+1;
-    setTimeout(()=>{
-      loadTrack(nextTrackIndex);
-    }, 50);
+/* =========================
+AUTOPLAY NEXT
+========================= */
+wavesurfer.on("finish",()=>{
+  if(autoplay && current<tracks.length-1){
+    current++;
+    setTimeout(()=>{loadTrack(current)},50);
   }
 });
 
-// Controlli
-document.getElementById("play").onclick = ()=>{wavesurfer.playPause();};
-document.getElementById("next").onclick = ()=>{
-  if(current<tracks.length-1){
-    nextTrackIndex = current+1;
-    loadTrack(current+1);
-  }
+/* =========================
+CONTROLLI
+========================= */
+document.getElementById("play").onclick=()=>wavesurfer.playPause();
+document.getElementById("next").onclick=()=>{
+  if(current<tracks.length-1){current++; loadTrack(current);}
 };
-document.getElementById("prev").onclick = ()=>{
-  if(current>0){
-    nextTrackIndex = current-1;
-    loadTrack(current-1);
-  }
+document.getElementById("prev").onclick=()=>{
+  if(current>0){current--; loadTrack(current);}
 };
+document.getElementById("autoplay").onclick=()=>{autoplay=!autoplay;};
 
-// Toggle Autoplay
-const autoplayBtn = document.getElementById("autoplay-toggle");
-autoplayBtn.onclick = () => {
-  autoplay = !autoplay;
-  autoplayBtn.innerText = "Autoplay: " + (autoplay ? "ON" : "OFF");
-  autoplayBtn.style.backgroundColor = autoplay ? getComputedStyle(document.documentElement).getPropertyValue('--color-autoplay-on').trim()
-                                                : getComputedStyle(document.documentElement).getPropertyValue('--color-autoplay-off').trim();
-};
+/* =========================
+INIT
+========================= */
+loadFolders();
 </script>
+
 </body>
 </html>

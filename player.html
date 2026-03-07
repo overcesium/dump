@@ -3,7 +3,303 @@
 <meta charset="UTF-8">
 
 <!-- Font DotGothic16 -->
+<link href="https:<html>
+<head>
+<meta charset="UTF-8">
+
+<!-- Font DotGothic16 -->
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/wavesurfer.js"></script>
+
+<style>
+:root{
+  --bg:#000000;
+  --text:#fff;
+  --accent:#ff0055;
+  --box:#1c1c1c;
+  --hover:#333;
+  --wave:#ff0055;
+  --progress:#fff;
+  --font:"DotGothic16", monospace;
+}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  margin:40px;
+  max-width:900px;
+}
+h2{margin-bottom:20px;}
+#waveform{margin-bottom:15px;}
+#controls{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:20px;
+}
+button{
+  background:none;
+  border:none;
+  cursor:pointer;
+}
+button img{
+  width:36px;
+  height:36px;
+}
+#time{font-size:12px;}
+#playlist{
+  background:var(--box);
+  border:1px solid var(--hover);
+  max-height:100px;
+  overflow-y:auto;
+  padding:4px 0;
+}
+.item{
+  padding:8px;
+  cursor:pointer;
+  border-bottom:1px solid var(--hover);
+}
+.item:hover{
+  background:var(--hover);
+}
+.active{
+  background:var(--accent);
+}
+.folder{
+  color:var(--accent);
+  font-weight:bold;
+}
+#breadcrumb{
+  margin-bottom:8px;
+  font-size:13px;
+  color:var(--accent);
+}
+</style>
+</head>
+
+<body>
+
+<h3>Library</h3> 
+
+<div id="controls">
+  <button id="prev"><img src="icons/prev.gif"></button>
+  <button id="play"><img src="icons/play.gif"></button>
+  <button id="next"><img src="icons/next.gif"></button>
+  <button id="autoplay"><img src="icons/auton.gif"></button>
+  <button id="loop"><img src="icons/loopon.gif"></button> <!-- Loop singola traccia -->
+  <div id="time">0:00 / 0:00</div>
+</div>
+
+<div id="playlist"></div>
+
+<div id="breadcrumb-container" style="display: flex; justify-content: space-between; align-items: center;">
+  <div id="breadcrumb"></div>
+  <button id="back" style="display:none;">
+    <img src="icons/back.gif" style="width: 18px; height: 18px;"> Back
+  </button>
+</div>
+
+<div id="waveform"></div>
+
+<script>
+/* CONFIG */
+const repo = "overcesium/dump";
+const base = "https://api.github.com/repos/"+repo+"/contents/mp3";
+
+let tracks=[];
+let current=0;
+let autoplay=true;
+let loopTrack=false; // Loop singola traccia
+let folderStack=[];
+let nextTrackIndex = null;
+
+/* WAVESURFER */
+const wavesurfer = WaveSurfer.create({
+  container:"#waveform",
+  waveColor:getComputedStyle(document.documentElement).getPropertyValue('--wave'),
+  progressColor:getComputedStyle(document.documentElement).getPropertyValue('--progress'),
+  height:120
+});
+
+/* ELEMENTI */
+const playlist=document.getElementById("playlist");
+const backBtn=document.getElementById("back");
+const breadcrumb=document.getElementById("breadcrumb");
+
+const playBtnImg = document.querySelector("#play img");
+const autoplayBtnImg = document.querySelector("#autoplay img");
+const loopBtnImg = document.querySelector("#loop img");
+
+// inizializza icone
+playBtnImg.src = "icons/play.gif";
+autoplayBtnImg.src = "icons/auton.gif";
+loopBtnImg.src = "icons/loopon.gif";
+
+/* FUNZIONI CARTELLE */
+function loadFolders(){
+  playlist.innerHTML="";
+  backBtn.style.display="none";
+  breadcrumb.innerText="Home";
+  folderStack=[];
+  
+  fetch(base)
+  .then(r=>r.json())
+  .then(items=>{
+    console.log("Loaded items from GitHub:", items); // Aggiungi questo log per verificare i dati caricati
+    items.forEach(item=>{
+      if(item.type==="dir"){
+        const div=document.createElement("div");
+        div.className="item folder";
+        div.innerText="📁 "+item.name;
+        div.onclick=()=>{
+          folderStack.push(item.name);
+          loadFolder(item.path);
+        };
+        playlist.appendChild(div);
+      }
+    });
+  }).catch(err => {
+    console.log("Errore nel caricamento delle cartelle:", err);
+  });
+}
+
+function loadFolder(path){
+  playlist.innerHTML="";
+  backBtn.style.display="inline-block";
+  updateBreadcrumb();
+  
+  fetch("https://api.github.com/repos/"+repo+"/contents/"+path)
+  .then(r=>r.json())
+  .then(files=>{
+    console.log("Loaded files from folder:", files); // Aggiungi questo log per vedere i file nella cartella
+    tracks = files.filter(f=>f.name.endsWith(".mp3"));
+    files.forEach((file,i)=>{
+      if(file.type==="file" && file.name.endsWith(".mp3")){
+        const div=document.createElement("div");
+        div.className="item";
+        div.innerText=file.name;
+        div.onclick=()=>{
+          current=i;
+          nextTrackIndex=null; // cancella eventuale autoplay precedente
+          loadTrack(i);
+        };
+        playlist.appendChild(div);
+      } else if(file.type==="dir") {
+        const div = document.createElement("div");
+        div.className = "item folder";
+        div.innerText = "📁 " + file.name;
+        div.onclick = () => {
+          folderStack.push(file.name);
+          loadFolder(file.path); // Ricarica la sottocartella
+        };
+        playlist.appendChild(div);
+      }
+    });
+  }).catch(err => {
+    console.log("Errore nel caricamento dei file:", err);
+  });
+}
+
+function updateBreadcrumb(){
+  breadcrumb.innerText = "Home" + (folderStack.length ? " / " + folderStack.join(" / ") : "");
+}
+
+/* BACK BUTTON */
+backBtn.onclick = ()=>{
+  folderStack.pop();
+  if(folderStack.length===0){
+    loadFolders();
+  } else {
+    const path = "mp3/" + folderStack.join("/");
+    loadFolder(path);
+  }
+};
+
+/* LOAD TRACK */
+function loadTrack(i){
+  highlight(i);
+  wavesurfer.load(tracks[i].download_url);
+}
+
+function highlight(i){
+  document.querySelectorAll(".item").forEach(el=>el.classList.remove("active"));
+  const active=document.querySelectorAll(".item")[i];
+  if(active) active.classList.add("active");
+}
+
+/* READY */
+wavesurfer.on("ready", ()=>{
+  updateTime();
+  if(nextTrackIndex !== null || !wavesurfer.isPlaying()){
+    if(nextTrackIndex !== null) current = nextTrackIndex;
+    wavesurfer.play();
+    updatePlayIcon();
+    nextTrackIndex = null;
+  }
+});
+
+/* TIME */
+wavesurfer.on("audioprocess",updateTime);
+wavesurfer.on("seek",updateTime);
+function updateTime(){
+  const t=wavesurfer.getCurrentTime();
+  const d=wavesurfer.getDuration();
+  document.getElementById("time").innerText=format(t)+" / "+format(d);
+}
+function format(sec){
+  sec=Math.floor(sec);
+  const m=Math.floor(sec/60);
+  const s=sec%60;
+  return m+":"+(s<10?"0"+s:s);
+}
+
+/* AUTOPLAY / LOOP */
+wavesurfer.on("finish", ()=>{
+if(loopTrack){
+  wavesurfer.seekTo(0); // torna all'inizio
+  wavesurfer.play();    // riprendi immediatamente
+  } else if(autoplay && current<tracks.length-1){
+    nextTrackIndex = current + 1;
+    setTimeout(()=>{ loadTrack(nextTrackIndex); },50);
+  }
+});
+
+/* FUNZIONI ICONA */
+function updatePlayIcon(){
+  playBtnImg.src = wavesurfer.isPlaying() ? "icons/pause.gif" : "icons/play.gif";
+}
+
+/* CONTROLLI */
+document.getElementById("play").onclick=()=>{
+  wavesurfer.playPause();
+  updatePlayIcon();
+};
+document.getElementById("next").onclick=()=>{
+  if(current<tracks.length-1){current++; nextTrackIndex=null; loadTrack(current);}
+};
+document.getElementById("prev").onclick=()=>{
+  if(current>0){current--; nextTrackIndex=null; loadTrack(current);}
+};
+document.getElementById("autoplay").onclick=()=>{
+  autoplay = !autoplay;
+  autoplayBtnImg.src = autoplay ? "icons/auton.gif" : "icons/autoff.gif";
+};
+document.getElementById("loop").onclick=()=>{
+  loopTrack = !loopTrack;
+  loopBtnImg.src = loopTrack ? "icons/loopoff.gif" : "icons/loopon.gif";
+};
+
+/* AGGIORNA ICONA ANCHE SE PLAY/PASSA TRACCE DA PLAYLIST */
+wavesurfer.on("play", updatePlayIcon);
+wavesurfer.on("pause", updatePlayIcon);
+
+/* INIT */
+loadFolders();
+</script>
+
+</body>
+</html>//fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
 
 <script src="https://unpkg.com/wavesurfer.js"></script>
 

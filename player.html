@@ -75,9 +75,7 @@ button img{
 
 <body>
 
-<h2>Trashy Music Player</h2>
-
-<div id="waveform"></div>
+<h3>Library</h3> 
 
 <div id="controls">
   <button id="prev"><img src="icons/prev.gif"></button>
@@ -85,14 +83,19 @@ button img{
   <button id="next"><img src="icons/next.gif"></button>
   <button id="autoplay"><img src="icons/auton.gif"></button>
   <button id="loop"><img src="icons/loopon.gif"></button> <!-- Loop singola traccia -->
-  <button id="back" style="display:none;"><img src="icons/back.gif"> Back</button>
   <div id="time">0:00 / 0:00</div>
 </div>
 
-<div id="breadcrumb"></div>
-
-<h3>Library</h3>
 <div id="playlist"></div>
+
+<div id="breadcrumb-container" style="display: flex; justify-content: space-between; align-items: center;">
+  <div id="breadcrumb"></div>
+  <button id="back" style="display:none;">
+    <img src="icons/back.gif" style="width: 18px; height: 18px;"> Back
+  </button>
+</div>
+
+<div id="waveform"></div>
 
 <script>
 /* CONFIG */

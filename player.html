@@ -180,6 +180,15 @@ function loadFolder(path){
           loadTrack(i);
         };
         playlist.appendChild(div);
+      } else if(file.type==="dir") {
+        const div = document.createElement("div");
+        div.className = "item folder";
+        div.innerText = "📁 " + file.name;
+        div.onclick = () => {
+          folderStack.push(file.name);
+          loadFolder(file.path); // Ricarica la sottocartella
+        };
+        playlist.appendChild(div);
       }
     });
   }).catch(err => {

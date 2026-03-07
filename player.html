@@ -141,6 +141,7 @@ function loadFolders(){
   fetch(base)
   .then(r=>r.json())
   .then(items=>{
+    console.log("Loaded items from GitHub:", items); // Aggiungi questo log per verificare i dati caricati
     items.forEach(item=>{
       if(item.type==="dir"){
         const div=document.createElement("div");
@@ -153,6 +154,8 @@ function loadFolders(){
         playlist.appendChild(div);
       }
     });
+  }).catch(err => {
+    console.log("Errore nel caricamento delle cartelle:", err);
   });
 }
 
@@ -164,6 +167,7 @@ function loadFolder(path){
   fetch("https://api.github.com/repos/"+repo+"/contents/"+path)
   .then(r=>r.json())
   .then(files=>{
+    console.log("Loaded files from folder:", files); // Aggiungi questo log per vedere i file nella cartella
     tracks = files.filter(f=>f.name.endsWith(".mp3"));
     files.forEach((file,i)=>{
       if(file.type==="file" && file.name.endsWith(".mp3")){
@@ -178,6 +182,8 @@ function loadFolder(path){
         playlist.appendChild(div);
       }
     });
+  }).catch(err => {
+    console.log("Errore nel caricamento dei file:", err);
   });
 }
 

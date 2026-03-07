@@ -8,23 +8,16 @@
 <script src="https://unpkg.com/wavesurfer.js"></script>
 
 <style>
-/* =========================
-VARIABILI COLORI E FONT
-========================= */
 :root{
---bg:#111;
---text:#fff;
---accent:#ff0055;
---box:#1c1c1c;
---hover:#333;
---wave:#ff0055;
---progress:#fff;
---font:"DotGothic16", monospace;
+  --bg:#111;
+  --text:#fff;
+  --accent:#ff0055;
+  --box:#1c1c1c;
+  --hover:#333;
+  --wave:#ff0055;
+  --progress:#fff;
+  --font:"DotGothic16", monospace;
 }
-
-/* =========================
-BASE
-========================= */
 body{
   background:var(--bg);
   color:var(--text);
@@ -33,15 +26,7 @@ body{
   max-width:900px;
 }
 h2{margin-bottom:20px;}
-
-/* =========================
-WAVEFORM
-========================= */
 #waveform{margin-bottom:15px;}
-
-/* =========================
-CONTROLLI
-========================= */
 #controls{
   display:flex;
   align-items:center;
@@ -58,10 +43,6 @@ button img{
   height:36px;
 }
 #time{font-size:12px;}
-
-/* =========================
-PLAYLIST
-========================= */
 #playlist{
   background:var(--box);
   border:1px solid var(--hover);
@@ -99,11 +80,12 @@ PLAYLIST
 <div id="waveform"></div>
 
 <div id="controls">
-  <button id="prev"><img src="icons/prev.png"></button>
-  <button id="play"><img src="icons/play.png"></button>
-  <button id="next"><img src="icons/next.png"></button>
-  <button id="autoplay"><img src="icons/autoplay.png"></button>
-  <button id="back" style="display:none;"><img src="icons/folder.png"> Back</button>
+  <button id="prev"><img src="icons/prev.gif"></button>
+  <button id="play"><img src="icons/play.gif"></button>
+  <button id="next"><img src="icons/next.gif"></button>
+  <button id="autoplay"><img src="icons/auton.gif"></button>
+  <button id="loop"><img src="icons/loopon.gif"></button> <!-- Loop singola traccia -->
+  <button id="back" style="display:none;"><img src="icons/back.gif"> Back</button>
   <div id="time">0:00 / 0:00</div>
 </div>
 
@@ -113,20 +95,18 @@ PLAYLIST
 <div id="playlist"></div>
 
 <script>
-/* =========================
-CONFIG
-========================= */
+/* CONFIG */
 const repo = "overcesium/dump";
 const base = "https://api.github.com/repos/"+repo+"/contents/mp3";
 
 let tracks=[];
 let current=0;
 let autoplay=true;
-let folderStack=[]; // per breadcrumb
+let loopTrack=false; // Loop singola traccia
+let folderStack=[];
+let nextTrackIndex = null;
 
-/* =========================
-WAVESURFER
-========================= */
+/* WAVESURFER */
 const wavesurfer = WaveSurfer.create({
   container:"#waveform",
   waveColor:getComputedStyle(document.documentElement).getPropertyValue('--wave'),
@@ -134,16 +114,21 @@ const wavesurfer = WaveSurfer.create({
   height:120
 });
 
-/* =========================
-ELEMENTI
-========================= */
+/* ELEMENTI */
 const playlist=document.getElementById("playlist");
 const backBtn=document.getElementById("back");
 const breadcrumb=document.getElementById("breadcrumb");
 
-/* =========================
-FUNZIONI PER CARTE
-========================= */
+const playBtnImg = document.querySelector("#play img");
+const autoplayBtnImg = document.querySelector("#autoplay img");
+const loopBtnImg = document.querySelector("#loop img");
+
+// inizializza icone
+playBtnImg.src = "icons/play.gif";
+autoplayBtnImg.src = "icons/auton.gif";
+loopBtnImg.src = "icons/loopon.gif";
+
+/* FUNZIONI CARTELLE */
 function loadFolders(){
   playlist.innerHTML="";
   backBtn.style.display="none";
@@ -184,6 +169,7 @@ function loadFolder(path){
         div.innerText=file.name;
         div.onclick=()=>{
           current=i;
+          nextTrackIndex=null; // cancella eventuale autoplay precedente
           loadTrack(i);
         };
         playlist.appendChild(div);
@@ -193,26 +179,21 @@ function loadFolder(path){
 }
 
 function updateBreadcrumb(){
-  breadcrumb.innerText = "Home / " + folderStack.join(" / ");
+  breadcrumb.innerText = "Home" + (folderStack.length ? " / " + folderStack.join(" / ") : "");
 }
 
-/* =========================
-BACK BUTTON
-========================= */
+/* BACK BUTTON */
 backBtn.onclick = ()=>{
   folderStack.pop();
   if(folderStack.length===0){
     loadFolders();
   } else {
-    // ricostruire path
     const path = "mp3/" + folderStack.join("/");
     loadFolder(path);
   }
 };
 
-/* =========================
-LOAD TRACK
-========================= */
+/* LOAD TRACK */
 function loadTrack(i){
   highlight(i);
   wavesurfer.load(tracks[i].download_url);
@@ -224,26 +205,25 @@ function highlight(i){
   if(active) active.classList.add("active");
 }
 
-/* =========================
-READY
-========================= */
-wavesurfer.on("ready",()=>{
+/* READY */
+wavesurfer.on("ready", ()=>{
   updateTime();
-  wavesurfer.play();
+  if(nextTrackIndex !== null || !wavesurfer.isPlaying()){
+    if(nextTrackIndex !== null) current = nextTrackIndex;
+    wavesurfer.play();
+    updatePlayIcon();
+    nextTrackIndex = null;
+  }
 });
 
-/* =========================
-TIME
-========================= */
+/* TIME */
 wavesurfer.on("audioprocess",updateTime);
 wavesurfer.on("seek",updateTime);
-
 function updateTime(){
   const t=wavesurfer.getCurrentTime();
   const d=wavesurfer.getDuration();
   document.getElementById("time").innerText=format(t)+" / "+format(d);
 }
-
 function format(sec){
   sec=Math.floor(sec);
   const m=Math.floor(sec/60);
@@ -251,31 +231,47 @@ function format(sec){
   return m+":"+(s<10?"0"+s:s);
 }
 
-/* =========================
-AUTOPLAY NEXT
-========================= */
-wavesurfer.on("finish",()=>{
-  if(autoplay && current<tracks.length-1){
-    current++;
-    setTimeout(()=>{loadTrack(current)},50);
+/* AUTOPLAY / LOOP */
+wavesurfer.on("finish", ()=>{
+if(loopTrack){
+  wavesurfer.seekTo(0); // torna all'inizio
+  wavesurfer.play();    // riprendi immediatamente
+  } else if(autoplay && current<tracks.length-1){
+    nextTrackIndex = current + 1;
+    setTimeout(()=>{ loadTrack(nextTrackIndex); },50);
   }
 });
 
-/* =========================
-CONTROLLI
-========================= */
-document.getElementById("play").onclick=()=>wavesurfer.playPause();
+/* FUNZIONI ICONA */
+function updatePlayIcon(){
+  playBtnImg.src = wavesurfer.isPlaying() ? "icons/pause.gif" : "icons/play.gif";
+}
+
+/* CONTROLLI */
+document.getElementById("play").onclick=()=>{
+  wavesurfer.playPause();
+  updatePlayIcon();
+};
 document.getElementById("next").onclick=()=>{
-  if(current<tracks.length-1){current++; loadTrack(current);}
+  if(current<tracks.length-1){current++; nextTrackIndex=null; loadTrack(current);}
 };
 document.getElementById("prev").onclick=()=>{
-  if(current>0){current--; loadTrack(current);}
+  if(current>0){current--; nextTrackIndex=null; loadTrack(current);}
 };
-document.getElementById("autoplay").onclick=()=>{autoplay=!autoplay;};
+document.getElementById("autoplay").onclick=()=>{
+  autoplay = !autoplay;
+  autoplayBtnImg.src = autoplay ? "icons/auton.gif" : "icons/autoff.gif";
+};
+document.getElementById("loop").onclick=()=>{
+  loopTrack = !loopTrack;
+  loopBtnImg.src = loopTrack ? "icons/loopoff.gif" : "icons/loopon.gif";
+};
 
-/* =========================
-INIT
-========================= */
+/* AGGIORNA ICONA ANCHE SE PLAY/PASSA TRACCE DA PLAYLIST */
+wavesurfer.on("play", updatePlayIcon);
+wavesurfer.on("pause", updatePlayIcon);
+
+/* INIT */
 loadFolders();
 </script>
 
